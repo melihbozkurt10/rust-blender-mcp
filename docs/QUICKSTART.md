@@ -5,7 +5,7 @@ Python execution.
 
 This archive holds the server binary. You also need the Blender extension, which
 is a separate download on the same release page:
-`rust-blender-mcp-<version>-blender-extension.zip`.
+`rust-blender-mcp-<version>-blender-extension.zip` (136 KB).
 
 Rust is not required. Nothing here is compiled on your machine.
 

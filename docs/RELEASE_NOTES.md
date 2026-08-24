@@ -40,8 +40,11 @@ troubleshooting: [docs/QUICKSTART.md](https://github.com/melihbozkurt10/rust-ble
 | macOS Intel | `rust-blender-mcp-0.1.0-macos-x86_64.tar.gz` |
 | Blender extension | `rust-blender-mcp-0.1.0-blender-extension.zip` |
 
-Verify with `SHA256SUMS.txt`. The binary is about 12.6 MB and the extension
-about 137 KB.
+Verify with `SHA256SUMS.txt`.
+
+Download sizes: 3.88 MB (macOS Apple Silicon), 4.13 MB (macOS Intel), 4.26 MB
+(Linux), 4.79 MB (Windows), plus 136 KB for the extension. Unpacked, the binary
+is 15.4 MB.
 
 The macOS binaries are unsigned; remove the quarantine attribute with
 `xattr -d com.apple.quarantine ./blender-mcp`. The Linux binary targets glibc
@@ -87,7 +90,7 @@ On an Intel i7-11800H, Windows 10, Blender 5.1.1, release build. Reproduce with
 | 100 transforms in one batch | 0.02 s (**10.4×**) |
 | Server startup to `initialize` | 0.023 s |
 | Idle server memory | 13.1 MB |
-| Combined download | 12.7 MB |
+| Download, archive + extension | 4.0–4.9 MB |
 
 Rust does not make Blender faster — `bpy` does the work and takes what it takes.
 What it buys is orchestration overhead near zero and the ability to coalesce work

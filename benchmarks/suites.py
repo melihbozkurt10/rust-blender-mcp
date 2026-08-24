@@ -787,6 +787,11 @@ def distribution(context: Context) -> dict[str, Any]:
     result["combined_download"] = {
         "bytes": combined,
         "human": harness.human_bytes(combined),
+        "note": (
+            "Uncompressed. A release ships the binary inside a zip or tar.gz, "
+            "which is roughly a third of this -- see the release page for what "
+            "is actually downloaded."
+        ),
     }
 
     source_bytes = directory_size(REPO_ROOT, exclude={".git", "target", "dist", "__pycache__"})

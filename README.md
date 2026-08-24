@@ -20,8 +20,8 @@ No Rust toolchain. No compiling. Two downloads.
 
 1. **Get the release** for your platform from
    [Releases](https://github.com/melihbozkurt10/rust-blender-mcp/releases) —
-   a `blender-mcp` binary (≈12.6 MB) and
-   `rust-blender-mcp-<version>-blender-extension.zip` (≈137 KB).
+   an archive holding the `blender-mcp` binary (3.9–4.8 MB) and
+   `rust-blender-mcp-<version>-blender-extension.zip` (136 KB).
 2. **Install the extension** in Blender:
    *Edit → Preferences → Add-ons → ▾ → Install from Disk…*, pick the zip, enable
    **Blender MCP Bridge**.
@@ -134,11 +134,17 @@ Build    cargo build --release
 | After 1,000 requests | 13.3 MB |
 | Default tool schema (`core`) | 10 tools · 8.1 KB · ~3,476 tokens¹ |
 | Full tool schema (all categories) | 247 tools · 400.8 KB · ~188,519 tokens¹ |
-| Combined download (binary + extension) | 12.7 MB |
+| Download: archive + extension | 4.0–4.9 MB² |
 
 ¹ Token counts are estimates from a documented deterministic estimator, not a
 model's own tokenizer. Byte counts are exact. See
 [`benchmarks/harness.py`](benchmarks/harness.py) for the exact rule.
+
+² What you actually download, from the published v0.1.0 assets: 4.02 MB on
+Apple Silicon, 4.27 MB on Intel macOS, 4.39 MB on Linux, 4.92 MB on Windows,
+each including the 136 KB extension. Unpacked, the binary is 15.4 MB — the
+`distribution` benchmark measures that uncompressed figure, which is why it
+reports a larger number than the release page.
 
 ### What these numbers do and do not say
 
@@ -386,7 +392,7 @@ python scripts/install_addon.py   # copies the add-on into Blender
 Requires Rust 1.88+ (edition 2024) and Blender 4.2 LTS or newer.
 
 Note that `target/` is a developer build cache and reaches tens of gigabytes. It
-is git-ignored and has nothing to do with the 12.7 MB a user downloads.
+is git-ignored and has nothing to do with the ~5 MB a user downloads.
 
 ## Testing
 
