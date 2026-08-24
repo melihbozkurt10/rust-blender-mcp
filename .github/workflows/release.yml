@@ -81,8 +81,12 @@ jobs:
             runner: macos-latest
             target: aarch64-apple-darwin
             archive: tar.gz
+          # Cross-compiled from the Apple Silicon runner rather than built on
+          # an Intel one. The x86_64 slice is in the same Xcode SDK, and the
+          # dedicated Intel runner images are being retired -- a release should
+          # not depend on a label that may stop existing.
           - label: macos-x86_64
-            runner: macos-13
+            runner: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
     steps:
