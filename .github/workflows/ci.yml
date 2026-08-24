@@ -28,7 +28,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install the toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -66,7 +66,7 @@ jobs:
     name: invariants
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Poly Haven, for real
@@ -118,14 +118,33 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+
+      # A GitHub runner has no GPU and no display. EEVEE still needs a GL
+      # context to render, and without one Blender aborts the whole process
+      # rather than returning an error -- which is what SIGABRT (exit 134) in
+      # this job means. Mesa's llvmpipe provides a software context so the
+      # render operations are genuinely exercised instead of skipped.
+      - name: Software OpenGL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri mesa-utils             libxi6 libxxf86vm1 libxfixes3 libxrender1 libsm6 libice6
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
+          echo "GALLIUM_DRIVER=llvmpipe" >> "$GITHUB_ENV"
 
       - name: Install Blender
         run: |
           sudo snap install blender --classic
           blender --version
+
+      # Which Blender snap ships changes without warning, and almost every
+      # difference this job finds is a version difference. Say which one.
+      - name: Which Blender, and can it draw
+        run: |
+          blender --version
+          blender --background --factory-startup             --python-expr 'import gpu,sys; print("GPU backend:", gpu.platform.backend_type_get(), gpu.platform.renderer_get())'             || echo "no GPU module available; EEVEE renders will not work"
 
       - name: Build the server
         run: cargo build -p blender-mcp-server
@@ -153,7 +172,7 @@ jobs:
     name: benchmark harness
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
