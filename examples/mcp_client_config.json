@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "Drop the `blender` entry into your MCP client's server configuration.",
+    "Claude Desktop keeps this in claude_desktop_config.json; other clients",
+    "use the same shape. Any client that speaks MCP over stdio will do -- no",
+    "endorsement by any client vendor is implied.",
+    "",
+    "Replace the command with the absolute path to the binary you downloaded",
+    "from the releases page, or to target/release/blender-mcp if you built it",
+    "yourself. MCP clients do not search PATH. On Windows use forward slashes",
+    "or escaped backslashes: C:/Tools/blender-mcp.exe",
+    "",
+    "BLENDER_MCP_EAGER_TOOLS=1 registers all 247 tools at startup. Leave it out",
+    "to start with the 10-tool core category and enable the rest on demand with",
+    "tools.categories.enable -- far cheaper in context, but only if your client",
+    "refreshes its tool list on notifications/tools/list_changed.",
+    "",
+    "BLENDER_MCP_SKETCHFAB_TOKEN is optional and only needed for Sketchfab",
+    "downloads. Poly Haven needs no credentials. Never put a token anywhere",
+    "other than the environment."
+  ],
+  "mcpServers": {
+    "blender": {
+      "command": "/absolute/path/to/blender-mcp",
+      "args": [],
+      "env": {
+        "BLENDER_MCP_EAGER_TOOLS": "1",
+        "BLENDER_MCP_WORKSPACE": "/absolute/path/to/a/working/directory",
+        "BLENDER_MCP_LOG": "info"
+      }
+    },
+    "_blender_lazy_example": {
+      "command": "/absolute/path/to/blender-mcp",
+      "args": [],
+      "env": {
+        "BLENDER_MCP_CATEGORIES": "scene,mesh,materials",
+        "BLENDER_MCP_PORT": "9877"
+      }
+    }
+  }
+}

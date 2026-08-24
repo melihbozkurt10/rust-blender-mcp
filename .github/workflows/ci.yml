@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # The Blender job below is the one that matters here: it is skipped on pull
+  # requests to keep them fast, so something has to run it regularly.
+  schedule:
+    - cron: "0 4 * * 1"
+
+env:
+  CARGO_TERM_COLOR: always
+  # A CI failure should be about the code, not about a crate that changed
+  # underneath it.
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # Everything that needs neither Blender nor a network. This is the job that
+  # must stay green; the others are informative.
+  rust:
+    name: rust / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Lints
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace --all-features
+
+      # The tool surface is part of the contract; a change in it should be
+      # visible in the log without anyone having to run anything.
+      - name: Tool inventory
+        run: cargo run -p blender-mcp-server --example tool_inventory
+
+      # Counts in the documentation go stale silently, which is worse than
+      # being absent. This fails the build instead.
+      - name: The documented counts are the real ones
+        if: runner.os == 'Linux'
+        run: python scripts/check_docs.py
+
+  # The invariants that need only Python. Fast enough to run everywhere.
+  invariants:
+    name: invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Repository invariants
+        run: python scripts/verify_repo.py
+
+      - name: Error taxonomy parity
+        run: python tests/protocol/test_error_parity.py
+
+      - name: The add-on packages reproducibly
+        run: |
+          python scripts/package_addon.py --out dist-a
+          python scripts/package_addon.py --out dist-b
+          python - <<'EOF'
+          import hashlib, pathlib, sys
+          a = next(pathlib.Path("dist-a").glob("*.zip"))
+          b = next(pathlib.Path("dist-b").glob("*.zip"))
+          digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+          if digest(a) != digest(b):
+              sys.exit("two builds of the same source produced different archives")
+          print(f"reproducible: {digest(a)}")
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blender-mcp-bridge-addon
+          path: dist-a/*.zip
+
+  # Reaches api.polyhaven.com. Kept separate so a provider outage cannot fail a
+  # pull request that has nothing to do with assets.
+  live-providers:
+    name: live providers
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Poly Haven, for real
+        run: cargo test -p asset-providers --test live_polyhaven -- --ignored --nocapture
+
+  # Needs a Blender install, which is a few hundred megabytes to download, so it
+  # is skipped on pull requests and run on push, on demand and weekly. These are
+  # the suites that genuinely exercise bpy: nothing here is simulated, and
+  # nothing in the `rust` job pretends to have run them.
+  blender:
+    name: blender
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Blender
+        run: |
+          sudo snap install blender --classic
+          blender --version
+
+      - name: Build the server
+        run: cargo build -p blender-mcp-server
+
+      - name: Every bridge operation
+        run: blender --background --factory-startup --python scripts/smoke_test.py
+
+      - name: Surface queries
+        run: blender --background --factory-startup --python tests/blender/test_scene_surface.py
+
+      - name: A stock Blender, from scratch
+        run: python tests/blender/test_standalone_smoke.py
+
+      - name: The whole stack
+        run: python tests/blender/test_bridge_roundtrip.py
+
+      - name: The asset pipeline
+        run: python tests/blender/test_asset_import.py
+
+  # The benchmark harness talks to the server over the real MCP transport, so a
+  # change that breaks it usually means a change that breaks a client. Only the
+  # suites that need no Blender run here; the rest need the `blender` job's
+  # install and are run locally before a release.
+  benchmarks:
+    name: benchmark harness
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+      - run: pip install psutil
+      - run: cargo build --release -p blender-mcp-server
+      - name: Server-only benchmarks
+        run: python scripts/benchmark.py --no-blender --quick --out benchmark-run
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-smoke
+          path: benchmark-run/

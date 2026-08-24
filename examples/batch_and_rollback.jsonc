@@ -1,0 +1,153 @@
+// Typed references, atomic batches, and what failure looks like.
+//
+// This is the file to read if you want to know what happens when something
+// goes wrong, which is the part most tool APIs are vague about.
+
+// ---------------------------------------------------------------------------
+// 1. Several changes in one round trip, referring to each other.
+//
+//    {"result_of": "base"} is a typed marker. The argument structure is walked
+//    and matching objects are replaced with the referenced value -- no string
+//    is ever interpolated into another string, so a name containing a brace or
+//    a quote is just a name.
+// ---------------------------------------------------------------------------
+{"name": "batch.execute", "arguments": {
+  "mode": "ATOMIC",
+  "operations": [
+    {"id": "base", "op": "object.create",
+     "args": {"type": "CUBE", "name": "Pedestal",
+              "dimensions": {"x": 0.4, "y": 0.4, "z": 0.9}}},
+
+    {"op": "object.transform",
+     "args": {"object": {"result_of": "base"},
+              "location": {"x": 0, "y": 0, "z": 0.45}}},
+
+    {"op": "modifier.add",
+     "args": {"object": {"result_of": "base"}, "type": "BEVEL",
+              "properties": [{"name": "width", "value": {"float": 0.008}},
+                             {"name": "segments", "value": {"int": 3}}]}},
+
+    {"id": "top", "op": "object.create",
+     "args": {"type": "CYLINDER", "name": "Turntable",
+              "dimensions": {"x": 0.5, "y": 0.5, "z": 0.02}}},
+
+    {"op": "object.set_parent",
+     "args": {"object": {"result_of": "top"},
+              "parent": {"result_of": "base"}, "keep_transform": true}}
+  ]}}
+// → {"success": true, "mode": "ATOMIC", "completed": 5, "total": 5,
+//    "results": [{"index": 0, "id": "base", "op": "object.create", "ok": true,
+//                 "result": {"object": {"id": "5c2e…", "name": "Pedestal"}}}, …]}
+
+// A reference can also point at a specific field:
+//   {"result_of": "base", "path": "object.name"}
+// With no `path` it resolves to the conventional identifier for that result,
+// which is what you want nine times in ten.
+
+// ---------------------------------------------------------------------------
+// 2. Failure in ATOMIC mode. One bad argument, and nothing survives.
+// ---------------------------------------------------------------------------
+{"name": "batch.execute", "arguments": {
+  "mode": "ATOMIC",
+  "operations": [
+    {"id": "a", "op": "object.create", "args": {"type": "UV_SPHERE", "name": "Ball"}},
+    {"op": "object.transform",
+     "args": {"object": {"result_of": "a"}, "scale": {"x": 1, "y": 0, "z": 1}}}
+  ]}}
+// → {"success": false, "mode": "ATOMIC", "completed": 1, "total": 2,
+//    "failed_index": 1, "rolled_back": true,
+//    "results": [
+//      {"index": 0, "id": "a", "op": "object.create", "ok": true, "result": {…}},
+//      {"index": 1, "op": "object.transform", "ok": false,
+//       "error": {"code": "INVALID_TRANSFORM",
+//                 "message": "`scale` has a zero component, which collapses the object and cannot be undone by scaling back.",
+//                 "details": {"field": "scale", "value": {"x": 1, "y": 0, "z": 1}}}}]}
+//
+// The sphere from step one is gone. `rolled_back: true` says so explicitly
+// rather than leaving you to infer it.
+
+// ---------------------------------------------------------------------------
+// 3. ATOMIC refuses external side effects up front, before running anything.
+// ---------------------------------------------------------------------------
+{"name": "batch.execute", "arguments": {
+  "mode": "ATOMIC",
+  "operations": [
+    {"op": "object.create", "args": {"type": "CUBE"}},
+    {"op": "render.execute", "args": {"samples": 32}}
+  ]}}
+// → {"code": "TRANSACTION_UNSUPPORTED",
+//    "message": "`render.execute` writes outside the .blend file, so it cannot take part in an atomic batch -- undoing would not remove what it wrote. Use STOP_ON_ERROR, or run it outside the batch.",
+//    "details": {"index": 1, "op": "render.execute"}}
+//
+// Nothing ran. An unwritten file cannot be un-written, and a batch that would
+// have to lie about that is refused instead.
+
+// ---------------------------------------------------------------------------
+// 4. BEST_EFFORT when partial progress is useful.
+// ---------------------------------------------------------------------------
+{"name": "batch.execute", "arguments": {
+  "mode": "BEST_EFFORT",
+  "operations": [
+    {"op": "object.delete", "args": {"objects": ["Cube"]}},
+    {"op": "object.delete", "args": {"objects": ["DoesNotExist"]}},
+    {"op": "object.delete", "args": {"objects": ["Light"]}}
+  ]}}
+// → {"success": false, "mode": "BEST_EFFORT", "completed": 2, "total": 3,
+//    "results": [{"index": 0, "ok": true, …},
+//                {"index": 1, "ok": false,
+//                 "error": {"code": "OBJECT_NOT_FOUND",
+//                           "message": "No object matches `DoesNotExist`.",
+//                           "details": {"reference": "DoesNotExist"}}},
+//                {"index": 2, "ok": true, …}]}
+
+// ---------------------------------------------------------------------------
+// 5. Workflows roll back differently: compensating actions, not undo. That
+//    works headless, where there is no undo stack at all.
+// ---------------------------------------------------------------------------
+{"name": "workflow.lighting.three_point", "arguments": {
+  "target": "Product",
+  "key_energy": -50}}
+// → {"code": "INVALID_ARGUMENT",
+//    "message": "`key_energy` must be positive.",
+//    "details": {"field": "key_energy", "value": -50.0}}
+//
+// Rejected in Rust, before Blender saw it. The round trip is not spent
+// discovering that the input was wrong.
+
+// If a step fails partway through instead:
+//
+// {"status": "failed",
+//  "steps": [{"name": "plan the rig", "ok": true, …},
+//            {"name": "create the collection", "ok": true, "op": "collection.create"},
+//            {"name": "create the key light", "ok": true, "op": "light.create"},
+//            {"name": "create the fill light", "ok": false, "op": "light.create",
+//             "error": {"code": "BLENDER_INTERNAL_ERROR", …}}],
+//  "rolled_back": true,
+//  "compensations": [{"op": "light.delete", "ok": true},
+//                    {"op": "collection.delete", "ok": true}]}
+//
+// Compensations run in reverse order. Pass "rollback_on_failure": false to
+// keep what succeeded and inspect it instead.
+
+// ---------------------------------------------------------------------------
+// 6. Finding out what happened, including what the user did by hand.
+// ---------------------------------------------------------------------------
+{"name": "scene.snapshot", "arguments": {}}
+// → {"revision": 41, "oldest_revision": 0, "history_capacity": 1000}
+
+// … work happens, some of it in the viewport …
+
+{"name": "scene.diff", "arguments": {"from_revision": 41}}
+// → {"from_revision": 41, "to_revision": 58,
+//    "created": [{"kind": "object", "id": "…", "name": "Pedestal"}],
+//    "modified": [{"kind": "object", "id": "…", "fields": ["transform"]}],
+//    "deleted": [], "mesh_invalidated": [], "reset": false}
+//
+// Changes are folded: an object created and then edited five times appears
+// once. And if the marker has aged out of the history window:
+//
+// {"code": "REVISION_EXPIRED",
+//  "message": "Revision 41 has fallen out of the 1000 entry history; the oldest answerable revision is 900. Take a fresh snapshot and diff from there.",
+//  "details": {"requested_revision": 41, "oldest_revision": 900, "current_revision": 1904}}
+//
+// An incomplete answer that looked complete would be worse than an error.

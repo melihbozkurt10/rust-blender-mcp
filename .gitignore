@@ -1,0 +1,52 @@
+# Rust build output. Reaches tens of gigabytes on a developer machine and has
+# nothing to do with the ~13 MB a user downloads.
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# Python bytecode.
+__pycache__/
+*.pyc
+*.pyo
+
+# Blender's own backups and autosaves.
+*.blend1
+*.blend2
+*.blend@
+
+# Packaged output. The release workflow builds these; they are not committed.
+/dist
+/dist-a
+/dist-b
+/dist-check
+/staging
+*.tar.gz
+rust-blender-mcp-*.zip
+
+# Runtime workspace, when someone points it at the checkout.
+.blender-mcp/
+/renders
+/exports
+/downloads
+
+# Benchmark scratch. `benchmarks/results/latest.{json,md}` IS committed -- it is
+# the published baseline -- so only ad-hoc output directories are ignored.
+/benchmark-run
+/benchmarks/results/*/
+!/benchmarks/results/latest.json
+!/benchmarks/results/latest.md
+
+# Editors and OS droppings.
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environments and local overrides.
+.env
+.env.*
+.venv/
+venv/

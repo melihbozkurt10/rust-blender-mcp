@@ -1,0 +1,12 @@
+[package]
+name = "blender-domain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Modelling, lighting, framing and node-graph planning for the Blender MCP server"
+
+[dependencies]
+blender-protocol = { workspace = true }
+serde = { workspace = true }
+schemars = { workspace = true }

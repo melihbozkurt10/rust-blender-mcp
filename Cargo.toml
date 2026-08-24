@@ -1,0 +1,48 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/blender-protocol",
+    "crates/blender-client",
+    "crates/mcp-server",
+    "crates/blender-domain",
+    "crates/workflow-engine",
+    "crates/scene-cache",
+    "crates/asset-providers",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+# `repository` is deliberately absent until the repository has a real URL.
+# A placeholder in package metadata ends up on crates.io and in every
+# downstream lockfile, which is worse than an omission.
+keywords = ["blender", "mcp", "3d", "automation", "graphics"]
+categories = ["graphics", "api-bindings", "command-line-utilities"]
+
+[workspace.dependencies]
+blender-protocol = { path = "crates/blender-protocol" }
+blender-client = { path = "crates/blender-client" }
+blender-domain = { path = "crates/blender-domain" }
+scene-cache = { path = "crates/scene-cache" }
+asset-providers = { path = "crates/asset-providers" }
+workflow-engine = { path = "crates/workflow-engine" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+schemars = { version = "1.0", features = ["uuid1"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "fs"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
+indexmap = { version = "2", features = ["serde"] }
+url = "2"
+sha2 = "0.10"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "native-tls"] }
+rmcp = { version = "3.1", features = ["server", "transport-io", "schemars", "macros"] }
+
+[profile.release]
+lto = "thin"
+strip = true

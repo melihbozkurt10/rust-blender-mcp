@@ -1,0 +1,22 @@
+[package]
+name = "workflow-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Deterministic multi-step Blender workflows with tracked rollback"
+
+[features]
+# Exposes the recording executor so downstream crates can test against a
+# workflow without a Blender.
+testing = []
+
+[dependencies]
+blender-protocol = { workspace = true }
+blender-domain = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

@@ -1,0 +1,232 @@
+name: Release
+
+# Tag-driven. `git tag v0.1.0 && git push origin v0.1.0` is the whole release
+# procedure; everything below is what that tag sets off.
+on:
+  push:
+    tags: ["v*"]
+  # So the build can be exercised without cutting a release.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and package, but do not publish a release"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  # A tag that does not pass the ordinary checks must not become a release.
+  # This is the same gate as CI, run again against the exact tagged tree.
+  gate:
+    name: quality gate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: TLS build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-features
+      - run: python scripts/verify_repo.py
+      - run: python tests/protocol/test_error_parity.py
+
+      - name: The tag matches the version in Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tagged="${GITHUB_REF_NAME#v}"
+          declared=$(grep -m1 '^version = ' Cargo.toml | tr -d '"' | awk '{print $3}')
+          if [ "$tagged" != "$declared" ]; then
+            echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $declared" >&2
+            exit 1
+          fi
+          echo "releasing $declared"
+
+  # One binary per platform. `fail-fast: false` so a target that breaks is
+  # visible on its own rather than hiding the others.
+  binaries:
+    name: ${{ matrix.label }}
+    needs: gate
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: windows-x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+          # 22.04 rather than the newest image: the binary then runs on
+          # anything with glibc 2.35 or newer, which is most of what people
+          # actually have.
+          - label: linux-x86_64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - label: macos-aarch64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - label: macos-x86_64
+            runner: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: TLS build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Build
+        run: cargo build --release --locked -p blender-mcp-server --target ${{ matrix.target }}
+
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version = ' Cargo.toml | tr -d '"' | awk '{print $3}')
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      # Only what a user needs to run the thing: the executable, the licence,
+      # the notice and a page telling them what to do next. No debug symbols,
+      # no build output, no sources.
+      - name: Stage the payload
+        shell: bash
+        run: |
+          set -eu
+          name="rust-blender-mcp-${{ steps.version.outputs.value }}-${{ matrix.label }}"
+          mkdir -p "staging/$name"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "target/${{ matrix.target }}/release/blender-mcp.exe" "staging/$name/"
+          else
+            cp "target/${{ matrix.target }}/release/blender-mcp" "staging/$name/"
+            chmod +x "staging/$name/blender-mcp"
+          fi
+          cp LICENSE NOTICE "staging/$name/"
+          cp docs/QUICKSTART.md "staging/$name/README.md"
+          echo "ARCHIVE_NAME=$name" >> "$GITHUB_ENV"
+
+      - name: Archive (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: Compress-Archive -Path "staging/$env:ARCHIVE_NAME" -DestinationPath "$env:ARCHIVE_NAME.zip"
+
+      - name: Archive (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: tar -czf "$ARCHIVE_NAME.tar.gz" -C staging "$ARCHIVE_NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: |
+            *.zip
+            *.tar.gz
+          if-no-files-found: error
+
+  extension:
+    name: blender extension
+    needs: gate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Package
+        run: python scripts/package_addon.py --out dist
+
+      # The packaging script fixes timestamps and sorts the file list, so the
+      # same source must always produce the same bytes. If it does not, the
+      # archive contains something that is not the source.
+      - name: The package is reproducible
+        run: |
+          python scripts/package_addon.py --out dist-check
+          a=$(sha256sum dist/*.zip | cut -d' ' -f1)
+          b=$(sha256sum dist-check/*.zip | cut -d' ' -f1)
+          [ "$a" = "$b" ] || { echo "packaging is not reproducible"; exit 1; }
+          echo "reproducible: $a"
+
+      - name: Nothing but the add-on is inside
+        run: |
+          python - <<'EOF'
+          import pathlib, sys, zipfile
+          archive = next(pathlib.Path("dist").glob("*.zip"))
+          names = zipfile.ZipFile(archive).namelist()
+          bad = [n for n in names if "__pycache__" in n or n.endswith((".pyc", ".rs"))
+                 or "/tests/" in n or n.startswith(("target/", "crates/"))]
+          if bad:
+              sys.exit(f"unexpected entries in the extension archive: {bad}")
+          roots = {n.split("/")[0] for n in names}
+          if roots != {"blender_mcp_bridge"}:
+              sys.exit(f"the archive must hold exactly one top-level directory, got {roots}")
+          print(f"{archive.name}: {len(names)} files, all under blender_mcp_bridge/")
+          EOF
+
+      - name: Rename to the release name
+        run: |
+          version=$(grep -m1 '^version = ' Cargo.toml | tr -d '"' | awk '{print $3}')
+          mv dist/*.zip "rust-blender-mcp-$version-blender-extension.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blender-extension
+          path: "*.zip"
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: [binaries, extension]
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: artifacts
+        run: |
+          # Written outside the directory first: a checksum file that lists
+          # itself is a checksum file nobody can verify.
+          sha256sum * > ../SHA256SUMS.txt
+          mv ../SHA256SUMS.txt .
+          cat SHA256SUMS.txt
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          body_path: docs/RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          # The token GitHub already provides. A release needs nothing else, and
+          # asking a maintainer for a personal token to cut one would be worse.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

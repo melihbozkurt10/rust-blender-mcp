@@ -1,0 +1,137 @@
+// A product shot from an empty scene: geometry, material, lighting, camera,
+// render. Twelve calls, none of which sends code.
+//
+// Each block is an MCP tools/call payload. Responses are abbreviated.
+
+// ---------------------------------------------------------------------------
+// 1. Look before touching. This is the intended first call in any session:
+//    it is in the always-on `core` category and costs one round trip.
+// ---------------------------------------------------------------------------
+{"name": "scene.summary", "arguments": {}}
+// → {"objects": {"MESH": 1, "LIGHT": 1, "CAMERA": 1}, "materials": 0,
+//    "active_camera": "Camera", "frame_range": [1, 250],
+//    "render_engine": "BLENDER_EEVEE_NEXT", "revision": 0}
+
+// ---------------------------------------------------------------------------
+// 2. Enable what this job needs. Skip if the server runs with
+//    BLENDER_MCP_EAGER_TOOLS=1.
+// ---------------------------------------------------------------------------
+{"name": "tools.categories.enable", "arguments": {"category": "mesh"}}
+{"name": "tools.categories.enable", "arguments": {"category": "materials"}}
+{"name": "tools.categories.enable", "arguments": {"category": "workflows"}}
+{"name": "tools.categories.enable", "arguments": {"category": "render"}}
+
+// ---------------------------------------------------------------------------
+// 3. A subject and a floor. `dimensions` sets real-world size directly --
+//    Blender reports zero dimensions before the depsgraph has evaluated, so
+//    the add-on computes them from the bounding box rather than reading a
+//    stale value.
+// ---------------------------------------------------------------------------
+{"name": "object.create", "arguments": {
+  "type": "CYLINDER",
+  "name": "Bottle",
+  "location": {"x": 0, "y": 0, "z": 0.11},
+  "dimensions": {"x": 0.07, "y": 0.07, "z": 0.22}}}
+// → {"object": {"id": "8f3a…", "name": "Bottle"}, "revision": 1}
+
+{"name": "object.create", "arguments": {
+  "type": "PLANE",
+  "name": "Floor",
+  "dimensions": {"x": 4, "y": 4, "z": 0}}}
+// → {"object": {"id": "1c7b…", "name": "Floor"}, "revision": 2}
+
+// The id is stable. Renaming the object later does not invalidate it, because
+// it lives in a custom property on the object rather than in its name.
+
+// ---------------------------------------------------------------------------
+// 4. Materials. `workflow.material.pbr` plans the whole graph in Rust and
+//    applies it in one call -- with no maps that is a plain Principled setup,
+//    which is exactly what a plastic bottle wants.
+// ---------------------------------------------------------------------------
+{"name": "workflow.material.pbr", "arguments": {
+  "name": "Bottle Plastic",
+  "base_color": {"r": 0.05, "g": 0.28, "b": 0.16, "a": 1.0},
+  "roughness": 0.35,
+  "assign_to": ["Bottle"]}}
+// → {"workflow": "workflow.material.pbr", "status": "ok",
+//    "steps": [{"name": "plan the shader graph", "ok": true, …},
+//              {"name": "create the material", "ok": true, …},
+//              {"name": "build the shader graph", "ok": true, …},
+//              {"name": "assign the material", "ok": true, …}],
+//    "material": "a41e…"}
+
+{"name": "workflow.material.pbr", "arguments": {
+  "name": "Studio Floor",
+  "base_color": {"r": 0.8, "g": 0.8, "b": 0.8, "a": 1.0},
+  "roughness": 0.6,
+  "assign_to": ["Floor"]}}
+
+// ---------------------------------------------------------------------------
+// 5. Lighting. Positions and energies are computed in Rust from the target's
+//    bounding box: key at 45 degrees, fill opposite at a fraction of the key,
+//    rim behind. If any light fails to create, the ones already made are
+//    deleted again -- compensating rollback, not undo, so it works headless.
+// ---------------------------------------------------------------------------
+{"name": "workflow.lighting.three_point", "arguments": {
+  "target": "Bottle",
+  "key_energy": 180,
+  "fill_ratio": 0.35,
+  "key_temperature": 5600,
+  "name_prefix": "Studio",
+  "collection": "Studio Lights"}}
+// → {"status": "ok",
+//    "steps": [{"name": "plan the rig", "ok": true,
+//               "detail": {"lights": 3, "radius": 0.12, "distance": 0.55}}, …],
+//    "lights": ["StudioKey", "StudioFill", "StudioRim"]}
+
+// ---------------------------------------------------------------------------
+// 6. Camera. `camera.auto_frame` solves for the distance that fits the
+//    subject's bounding box, taking sensor fit and aspect ratio into account.
+//    Closed-form, in Rust, unit-tested against hand-computed answers -- no
+//    trial renders, no guessing.
+// ---------------------------------------------------------------------------
+{"name": "camera.create", "arguments": {
+  "name": "Product Camera",
+  "lens": {"millimetres": 85.0}}}
+// `lens` is one of {"millimetres": …} or {"fov_degrees": …}: a bare number
+// would be ambiguous, and the ambiguity is the kind that produces a shot
+// nobody notices is wrong until later.
+
+{"name": "camera.auto_frame", "arguments": {
+  "camera": "Product Camera",
+  "objects": ["Bottle"],
+  "padding": 0.25,
+  "direction": {"x": -0.6, "y": -1.0, "z": 0.45}}}
+// → {"camera": "…", "location": {…}, "rotation": {…}, "distance": 0.71,
+//    "focal_length": 85.0, "fits": true}
+
+{"name": "camera.set_active", "arguments": {"camera": "Product Camera"}}
+
+// ---------------------------------------------------------------------------
+// 7. Render. This is an EXTERNAL_SIDE_EFFECT: it writes a file, it is never
+//    retried automatically, and it cannot take part in an atomic batch --
+//    an unwritten file cannot be un-written.
+//
+//    The result is an artifact reference, not base64. The image stays on disk
+//    in the managed renders root.
+// ---------------------------------------------------------------------------
+{"name": "render.execute", "arguments": {
+  "camera": "Product Camera",
+  "resolution_x": 1600,
+  "resolution_y": 2000,
+  "samples": 128,
+  "format": "PNG",
+  "transparent_background": false,
+  "name": "bottle_hero"}}
+// → {"artifact": {"id": "r-4e91…", "path": "renders/bottle_hero.png",
+//                 "size_bytes": 1843200, "mime_type": "image/png"},
+//    "engine": "BLENDER_EEVEE_NEXT", "seconds": 4.2}
+
+// ---------------------------------------------------------------------------
+// 8. What actually changed? The server tracked it while you worked, including
+//    anything the user did by hand in the viewport.
+// ---------------------------------------------------------------------------
+{"name": "scene.diff", "arguments": {"from_revision": 0}}
+// → {"from_revision": 0, "to_revision": 14,
+//    "created": [{"kind": "object", "id": "8f3a…", "name": "Bottle"}, …],
+//    "modified": […], "deleted": [], "reset": false}

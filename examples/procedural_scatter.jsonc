@@ -1,0 +1,108 @@
+// Geometry nodes, driven from plans built in Rust.
+//
+// A scatter setup is six nodes and eight links, plus a random-value node whose
+// four output sockets are all called "Value". Building it by sending Python
+// would be a paragraph of string; building it by hand is eight round trips and
+// a socket-name lottery. Here it is one call.
+
+// ---------------------------------------------------------------------------
+// 1. Something to scatter over, and something to scatter.
+// ---------------------------------------------------------------------------
+{"name": "object.create", "arguments": {
+  "type": "PLANE", "name": "Ground", "dimensions": {"x": 20, "y": 20, "z": 0}}}
+
+{"name": "object.create", "arguments": {
+  "type": "ICO_SPHERE", "name": "Rock",
+  "location": {"x": 0, "y": 0, "z": -10},
+  "dimensions": {"x": 0.4, "y": 0.4, "z": 0.3}}}
+// Parked below the ground plane: it is the instanced source, not set dressing.
+
+// ---------------------------------------------------------------------------
+// 2. Scatter. The whole node graph -- Distribute Points on Faces, Instance on
+//    Points, Random Value for scale, Rotate Instances for jitter, Realize --
+//    is planned in `blender-domain`, validated in Rust, and applied by one
+//    `geometry_nodes.graph.build` call inside the workflow.
+// ---------------------------------------------------------------------------
+{"name": "geometry_nodes.scatter", "arguments": {
+  "surface": "Ground",
+  "source": {"object": "Rock"},
+  "density": 4.0,
+  "seed": 12,
+  "scale_min": 0.6,
+  "scale_max": 1.8,
+  "rotation_jitter": {"x": 0.1, "y": 0.1, "z": 3.14159},
+  "align_to_normal": true,
+  "minimum_distance": 0.35,
+  "realize_instances": false,
+  "name": "Rock Scatter"}}
+// → {"status": "ok",
+//    "steps": [{"name": "plan the scatter graph", "ok": true,
+//               "detail": {"nodes": 7, "links": 9}},
+//              {"name": "create the node group", "ok": true, …},
+//              {"name": "build the graph", "ok": true, …},
+//              {"name": "attach the modifier", "ok": true, …}],
+//    "node_group": "…", "modifier": "…"}
+//
+// `source` is a tagged choice -- {"object": …} or {"collection": …} -- so
+// "instance this one thing" and "instance one of these things" cannot be
+// confused for each other.
+
+// ---------------------------------------------------------------------------
+// 3. Adjust without rebuilding. The node keys in the plan are stable, so the
+//    density input can be changed on its own.
+// ---------------------------------------------------------------------------
+{"name": "geometry_nodes.node.list", "arguments": {"node_tree": "Rock Scatter"}}
+// → {"nodes": [{"name": "Distribute Points on Faces", "type": "GeometryNodeDistributePointsOnFaces",
+//               "inputs": ["Mesh", "Selection", "Distance Min", "Density Max",
+//                          "Density Factor", "Seed"]}, …]}
+
+{"name": "geometry_nodes.node.update", "arguments": {
+  "node_tree": "Rock Scatter",
+  "node": "Distribute Points on Faces",
+  "inputs": [{"name": "Density Max", "value": {"float": 9.0}}]}}
+
+// The socket is chosen by `name`, `identifier` or `index`, and the value
+// carries its own type. That pairing is why there is no
+// `setattr(node, name, value)` anywhere in the add-on: a string cannot land
+// in a float socket, and a property name that the node does not advertise is
+// refused rather than assigned.
+
+// A socket name that does not exist comes back with the ones that do:
+//
+// {"code": "INVALID_NODE_SOCKET",
+//  "message": "`Density` is not an input on this node.",
+//  "details": {"requested": "Density",
+//              "available": ["Mesh", "Selection", "Distance Min",
+//                            "Density Max", "Density Factor", "Seed"]}}
+//
+// That is the difference between a model correcting itself on the next call
+// and a model guessing again.
+
+// ---------------------------------------------------------------------------
+// 4. An array along a curve, the same way.
+// ---------------------------------------------------------------------------
+{"name": "object.create", "arguments": {"type": "CURVE", "name": "Path"}}
+
+{"name": "geometry_nodes.array_along_curve", "arguments": {
+  "source": "Rock",
+  "curve": "Path",
+  "offset": 1.5,
+  "follow_curve": true,
+  "align_axis": "Y",
+  "attach_to": "Path",
+  "name": "Rock Line"}}
+
+// ---------------------------------------------------------------------------
+// 5. Node types are checked against the running Blender before anything is
+//    sent. Asking for one that this build does not have:
+// ---------------------------------------------------------------------------
+{"name": "geometry_nodes.node.create", "arguments": {
+  "node_tree": "Rock Scatter",
+  "node_type": "GeometryNodeMadeUpThing"}}
+// → {"code": "CAPABILITY_UNAVAILABLE",
+//    "message": "This Blender has no geometry node type `GeometryNodeMadeUpThing`.",
+//    "details": {"requested": "GeometryNodeMadeUpThing",
+//                "did_you_mean": "GeometryNodeMeshCube"}}
+//
+// The capability list comes from the add-on at connection time, so this stays
+// accurate across Blender versions without a single version check.

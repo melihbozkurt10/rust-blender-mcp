@@ -1,0 +1,467 @@
+{
+  "generated_utc": "2026-08-24 19:28:37Z",
+  "label": "Published baseline for v0.1.0",
+  "scale": 1.0,
+  "environment": {
+    "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+    "cpu_cores_physical": 8,
+    "cpu_threads": 16,
+    "ram_gb": 15.8,
+    "os": "Windows 10 (10.0.19045)",
+    "machine": "AMD64",
+    "python": "3.14.2",
+    "blender": "Blender 5.1.1",
+    "project_version": "0.1.0",
+    "git_commit": "uncommitted",
+    "build_profile": "release"
+  },
+  "results": {
+    "mcp_roundtrip": {
+      "tool": "blender.status",
+      "path": "MCP client -> stdio -> Rust server -> handler -> back (no Blender IPC)",
+      "warmup_requests": 1000,
+      "stats": {
+        "count": 10000,
+        "min_ms": 0.0686,
+        "mean_ms": 0.1209,
+        "p50_ms": 0.1163,
+        "p95_ms": 0.1715,
+        "p99_ms": 0.2216,
+        "max_ms": 0.894,
+        "stdev_ms": 0.0336,
+        "total_s": 1.2142,
+        "per_second": 8236.1
+      },
+      "client_json_overhead_ms": 0.0062
+    },
+    "startup": {
+      "samples": 7,
+      "note": "Server-ready is spawn to a completed MCP `initialize`. Blender-connect is a cold `blender --background --factory-startup` launching the bridge and completing the socket handshake; most of it is Blender's own start-up, not the bridge's.",
+      "server_ready": {
+        "count": 7,
+        "min_ms": 21.6288,
+        "mean_ms": 22.5162,
+        "p50_ms": 22.7149,
+        "p95_ms": 23.446,
+        "p99_ms": 23.446,
+        "max_ms": 23.446,
+        "stdev_ms": 0.8022,
+        "total_s": 0.1576,
+        "per_second": 44.4
+      },
+      "blender_connect": {
+        "count": 7,
+        "min_ms": 2595.4572,
+        "mean_ms": 2737.224,
+        "p50_ms": 2778.5951,
+        "p95_ms": 2995.0353,
+        "p99_ms": 2995.0353,
+        "max_ms": 2995.0353,
+        "stdev_ms": 144.068,
+        "total_s": 19.1606,
+        "per_second": 0.4
+      },
+      "ready_to_operate": {
+        "count": 7,
+        "min_ms": 2618.9091,
+        "mean_ms": 2759.7452,
+        "p50_ms": 2801.3166,
+        "p95_ms": 3018.1973,
+        "p99_ms": 3018.1973,
+        "max_ms": 3018.1973,
+        "stdev_ms": 144.3773,
+        "total_s": 19.3182,
+        "per_second": 0.4
+      },
+      "first_capabilities_call": {
+        "count": 7,
+        "min_ms": 0.4258,
+        "mean_ms": 0.5354,
+        "p50_ms": 0.5652,
+        "p95_ms": 0.6275,
+        "p99_ms": 0.6275,
+        "max_ms": 0.6275,
+        "stdev_ms": 0.076,
+        "total_s": 0.0037,
+        "per_second": 1867.6
+      }
+    },
+    "bridge_floor": {
+      "op": "system.ping",
+      "path": "benchmark harness -> framed socket -> inbox -> main-thread pump -> dispatch -> back",
+      "excludes": "the Rust MCP server and any bpy work",
+      "pump_interval_ms": {
+        "busy_ms": 1.0,
+        "idle_ms": 8.0,
+        "active_window_ms": 500.0
+      },
+      "stats": {
+        "count": 2000,
+        "min_ms": 0.9733,
+        "mean_ms": 1.9989,
+        "p50_ms": 1.9978,
+        "p95_ms": 2.2017,
+        "p99_ms": 2.3655,
+        "max_ms": 4.8878,
+        "stdev_ms": 0.1567,
+        "total_s": 4.0006,
+        "per_second": 499.9
+      }
+    },
+    "blender_ops": {
+      "path": "MCP client -> Rust server -> framed IPC -> Blender main thread -> bpy -> back",
+      "note": "Each figure is one whole round trip. It is not split into server / IPC / bpy components because the bridge does not timestamp the stages, and a split that is not measured would be a guess. Compare against `bridge_floor`, which is the same path with the bpy work removed.",
+      "operations": {
+        "scene.statistics": {
+          "count": 200,
+          "min_ms": 1.4456,
+          "mean_ms": 1.9972,
+          "p50_ms": 2.0015,
+          "p95_ms": 2.3388,
+          "p99_ms": 2.4886,
+          "max_ms": 2.6544,
+          "stdev_ms": 0.1938,
+          "total_s": 0.3997,
+          "per_second": 500.4
+        },
+        "object.transform": {
+          "count": 200,
+          "min_ms": 1.2685,
+          "mean_ms": 2.0116,
+          "p50_ms": 1.9634,
+          "p95_ms": 2.4388,
+          "p99_ms": 2.7366,
+          "max_ms": 6.6855,
+          "stdev_ms": 0.4241,
+          "total_s": 0.4026,
+          "per_second": 496.8
+        },
+        "object.create": {
+          "count": 100,
+          "min_ms": 3.6734,
+          "mean_ms": 9.9997,
+          "p50_ms": 10.1464,
+          "p95_ms": 14.2955,
+          "p99_ms": 16.4861,
+          "max_ms": 18.9321,
+          "stdev_ms": 3.27,
+          "total_s": 1.0001,
+          "per_second": 100.0
+        },
+        "modifier.add": {
+          "count": 100,
+          "min_ms": 1.4035,
+          "mean_ms": 1.9764,
+          "p50_ms": 1.9464,
+          "p95_ms": 2.4174,
+          "p99_ms": 2.5704,
+          "max_ms": 2.7717,
+          "stdev_ms": 0.2717,
+          "total_s": 0.1978,
+          "per_second": 505.7
+        },
+        "material.assign": {
+          "count": 100,
+          "min_ms": 1.4735,
+          "mean_ms": 1.9987,
+          "p50_ms": 1.9933,
+          "p95_ms": 2.3092,
+          "p99_ms": 2.451,
+          "max_ms": 2.4918,
+          "stdev_ms": 0.2003,
+          "total_s": 0.2,
+          "per_second": 500.0
+        }
+      }
+    },
+    "sequential": {
+      "operation": "object.transform",
+      "note": "One MCP tool call per transform: N request/response round trips.",
+      "runs": {
+        "100": {
+          "operations": 100,
+          "total_s": 0.1996,
+          "ops_per_second": 501.0,
+          "stats": {
+            "count": 100,
+            "min_ms": 1.2322,
+            "mean_ms": 1.9944,
+            "p50_ms": 2.0249,
+            "p95_ms": 2.3983,
+            "p99_ms": 2.6346,
+            "max_ms": 2.653,
+            "stdev_ms": 0.2704,
+            "total_s": 0.1996,
+            "per_second": 501.0
+          }
+        },
+        "500": {
+          "operations": 500,
+          "total_s": 0.9997,
+          "ops_per_second": 500.1,
+          "stats": {
+            "count": 500,
+            "min_ms": 1.1867,
+            "mean_ms": 1.9982,
+            "p50_ms": 1.9931,
+            "p95_ms": 2.3751,
+            "p99_ms": 2.6025,
+            "max_ms": 6.1941,
+            "stdev_ms": 0.3078,
+            "total_s": 0.9997,
+            "per_second": 500.1
+          }
+        },
+        "1000": {
+          "operations": 1000,
+          "total_s": 1.998,
+          "ops_per_second": 500.5,
+          "stats": {
+            "count": 1000,
+            "min_ms": 1.1204,
+            "mean_ms": 1.9968,
+            "p50_ms": 1.9893,
+            "p95_ms": 2.3541,
+            "p99_ms": 2.6264,
+            "max_ms": 5.2735,
+            "stdev_ms": 0.2584,
+            "total_s": 1.998,
+            "per_second": 500.5
+          }
+        }
+      }
+    },
+    "batch": {
+      "operation": "object.transform",
+      "batch_cap": 200,
+      "note": "`speedup` above 1 means the batch was faster. Batching removes per-call round trips; it does not make the underlying bpy call any faster, so the ceiling is set by how much of a call's cost was the round trip.",
+      "runs": {
+        "10": {
+          "operations": 10,
+          "individual_total_s": 0.0199,
+          "individual_per_op_ms": 1.9926,
+          "batch_chunks": 1,
+          "batch_total_s": 0.004,
+          "batch_per_op_ms": 0.4042,
+          "speedup": 4.93
+        },
+        "100": {
+          "operations": 100,
+          "individual_total_s": 0.2051,
+          "individual_per_op_ms": 2.0513,
+          "batch_chunks": 1,
+          "batch_total_s": 0.0197,
+          "batch_per_op_ms": 0.1973,
+          "speedup": 10.4
+        },
+        "500": {
+          "operations": 500,
+          "individual_total_s": 1.0032,
+          "individual_per_op_ms": 2.0065,
+          "batch_chunks": 3,
+          "batch_chunk_size": 200,
+          "note": "500 exceeds the 200-operation batch cap, so this is 3 chunked batches, not one.",
+          "batch_total_s": 0.0925,
+          "batch_per_op_ms": 0.1849,
+          "speedup": 10.85
+        },
+        "1000": {
+          "operations": 1000,
+          "individual_total_s": 2.0093,
+          "individual_per_op_ms": 2.0093,
+          "batch_chunks": 5,
+          "batch_chunk_size": 200,
+          "note": "1000 exceeds the 200-operation batch cap, so this is 5 chunked batches, not one.",
+          "batch_total_s": 0.1826,
+          "batch_per_op_ms": 0.1826,
+          "speedup": 11.0
+        }
+      }
+    },
+    "context_footprint": {
+      "tokenizer": "estimate",
+      "tokenizer_note": "`estimate` is the documented deterministic estimator in benchmarks/harness.py, not a model tokenizer. It is an estimate; byte counts are exact.",
+      "measured": "the exact JSON of an MCP `tools/list` reply, as a client receives it",
+      "sets": {
+        "core": {
+          "categories": [
+            "core"
+          ],
+          "tool_count": 10,
+          "schema_bytes": 8309,
+          "schema_kb": 8.1,
+          "tokens": 3476,
+          "tools_list_ms": {
+            "count": 50,
+            "min_ms": 0.1454,
+            "mean_ms": 0.1969,
+            "p50_ms": 0.1793,
+            "p95_ms": 0.2653,
+            "p99_ms": 0.2835,
+            "max_ms": 0.2835,
+            "stdev_ms": 0.0386,
+            "total_s": 0.0098,
+            "per_second": 5079.3
+          }
+        },
+        "core+scene": {
+          "categories": [
+            "core",
+            "scene"
+          ],
+          "tool_count": 50,
+          "schema_bytes": 51789,
+          "schema_kb": 50.6,
+          "tokens": 23203,
+          "tools_list_ms": {
+            "count": 50,
+            "min_ms": 0.6564,
+            "mean_ms": 0.7726,
+            "p50_ms": 0.7599,
+            "p95_ms": 1.0291,
+            "p99_ms": 1.0621,
+            "max_ms": 1.0621,
+            "stdev_ms": 0.092,
+            "total_s": 0.0386,
+            "per_second": 1294.4
+          }
+        },
+        "core+mesh": {
+          "categories": [
+            "core",
+            "mesh"
+          ],
+          "tool_count": 30,
+          "schema_bytes": 35494,
+          "schema_kb": 34.7,
+          "tokens": 15680,
+          "tools_list_ms": {
+            "count": 50,
+            "min_ms": 0.4652,
+            "mean_ms": 0.5725,
+            "p50_ms": 0.5585,
+            "p95_ms": 0.6802,
+            "p99_ms": 0.8505,
+            "max_ms": 0.8505,
+            "stdev_ms": 0.0725,
+            "total_s": 0.0286,
+            "per_second": 1746.6
+          }
+        },
+        "core+materials": {
+          "categories": [
+            "core",
+            "materials"
+          ],
+          "tool_count": 19,
+          "schema_bytes": 21845,
+          "schema_kb": 21.3,
+          "tokens": 9791,
+          "tools_list_ms": {
+            "count": 50,
+            "min_ms": 0.2952,
+            "mean_ms": 0.3941,
+            "p50_ms": 0.3909,
+            "p95_ms": 0.5114,
+            "p99_ms": 0.6148,
+            "max_ms": 0.6148,
+            "stdev_ms": 0.0658,
+            "total_s": 0.0197,
+            "per_second": 2537.3
+          }
+        },
+        "modelling_session": {
+          "categories": [
+            "core",
+            "scene",
+            "mesh",
+            "modifiers",
+            "materials"
+          ],
+          "tool_count": 87,
+          "schema_bytes": 108816,
+          "schema_kb": 106.3,
+          "tokens": 49180,
+          "tools_list_ms": {
+            "count": 50,
+            "min_ms": 1.3956,
+            "mean_ms": 2.1311,
+            "p50_ms": 1.8335,
+            "p95_ms": 3.3006,
+            "p99_ms": 12.9685,
+            "max_ms": 12.9685,
+            "stdev_ms": 1.6388,
+            "total_s": 0.1066,
+            "per_second": 469.2
+          }
+        },
+        "all": {
+          "categories": "all",
+          "tool_count": 247,
+          "schema_bytes": 410408,
+          "schema_kb": 400.8,
+          "tokens": 188519,
+          "tools_list_ms": {
+            "count": 50,
+            "min_ms": 7.0185,
+            "mean_ms": 9.1034,
+            "p50_ms": 8.3959,
+            "p95_ms": 13.6588,
+            "p99_ms": 15.6616,
+            "max_ms": 15.6616,
+            "stdev_ms": 1.908,
+            "total_s": 0.4552,
+            "per_second": 109.8
+          }
+        }
+      },
+      "activation": {
+        "enable_ms": 0.401,
+        "relist_ms": 1.004,
+        "tools_after_enable": 30,
+        "tools_after_disable": 10,
+        "disable_leaves_no_stale_tools": true
+      }
+    },
+    "memory": {
+      "startup_rss_mb": 12.67,
+      "idle_rss_mb": 13.14,
+      "after_1000_requests_rss_mb": 13.27,
+      "after_batch_rss_mb": 14.21,
+      "platform": "win32",
+      "metric": "resident set size; on Windows this is the process working set"
+    },
+    "distribution": {
+      "binary": {
+        "path": "target/release/blender-mcp.exe",
+        "bytes": 13198848,
+        "human": "12.6 MB"
+      },
+      "extension": {
+        "file": "blender_mcp_bridge-0.1.0.zip",
+        "bytes": 140030,
+        "human": "136.7 KB"
+      },
+      "combined_download": {
+        "bytes": 13338878,
+        "human": "12.7 MB"
+      },
+      "source_tree": {
+        "bytes": 2202989,
+        "human": "2.1 MB",
+        "excludes": [
+          ".git",
+          "target",
+          "dist",
+          "__pycache__"
+        ]
+      },
+      "build_cache": {
+        "path": "target/",
+        "bytes": 13015846864,
+        "human": "12.1 GB",
+        "note": "A developer's Rust build cache. It is git-ignored, it is never published, and it has nothing to do with what a user downloads."
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+[package]
+name = "scene-cache"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Revision tracking, snapshots and diffs for the Blender scene"
+
+[dependencies]
+blender-protocol = { workspace = true }
+serde = { workspace = true }
+schemars = { workspace = true }
+indexmap = { workspace = true }
+tracing = { workspace = true }

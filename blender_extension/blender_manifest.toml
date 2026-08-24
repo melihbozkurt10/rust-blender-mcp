@@ -1,0 +1,26 @@
+schema_version = "1.0.0"
+
+id = "blender_mcp_bridge"
+version = "0.1.0"
+name = "Blender MCP Bridge"
+tagline = "Typed, persistent bridge to the Rust Blender MCP server"
+maintainer = "blender-mcp contributors"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+
+# Apache-2.0 is compatible with Blender's GPL-3.0-or-later, so an add-on may
+# carry it. The whole repository says the same thing; see NOTICE.
+license = ["SPDX:Apache-2.0"]
+
+# The bridge opens a loopback TCP connection to the MCP server. It never
+# fetches anything from the internet itself: external asset downloads happen in
+# the Rust server, which owns the download directory and the licence checks.
+permissions = { network = "Connects to the local MCP server over loopback TCP" }
+
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  "/.git/",
+  "*.pyc",
+]

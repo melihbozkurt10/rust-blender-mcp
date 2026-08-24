@@ -1,0 +1,17 @@
+# Normalise line endings in the repository to LF regardless of the machine that
+# committed. The add-on archive is built from these files and its hash is
+# checked for reproducibility, so a checkout whose line endings depend on the
+# operating system would make that check platform-dependent.
+* text=auto eol=lf
+
+# Windows-only files that genuinely want CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Never touch these.
+*.png binary
+*.jpg binary
+*.zip binary
+*.blend binary
+*.exr binary
+*.hdr binary

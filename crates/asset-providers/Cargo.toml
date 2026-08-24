@@ -1,0 +1,28 @@
+[package]
+name = "asset-providers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "External asset libraries (Poly Haven, Sketchfab) behind one trait"
+
+[features]
+# Exposes the stub fetcher so other crates can test asset flows without a
+# network.
+testing = []
+
+[dependencies]
+blender-protocol = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+sha2 = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros", "fs"] }
